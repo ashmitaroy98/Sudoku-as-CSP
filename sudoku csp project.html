@@ -1,0 +1,297 @@
+<!doctype html>
+<html>
+
+  <body>
+      <button id="sudoku-button">Solve Sudoku</button>
+      <br>
+      <span id="sudoku-start" style="float: left; font-family: Consolas, monospace;"></span>
+      <span id="sudoku" style="float: left; font-family: Consolas, monospace;"></span>
+
+      <script>
+      !function() {
+
+      var CSPALG = {},
+          FAILURE = 'FAILURE',
+          stepCounter = 0;
+
+      CSPALG.solve = function solve(CSPALG) {
+
+
+        CSPALG.timeStep = CSPALG.timeStep || 1;
+        var res = backtrackingAlg({}, CSPALG.variables, CSPALG);
+        if (res == FAILURE) { return res; }
+        // Unwrap values from array containers.
+        for (var key in res) {
+          res[key] = res[key][0];
+        }
+        return res;
+      }
+
+      function backtrackingAlg(_assgn, unassgn, CSPALG) {
+        // backtrackingAlging search.
+
+        var assigned = {};
+        for (var key in _assgn) { assigned[key] = _assgn[key]; }
+
+        if (finished(unassgn)) { return assigned; } // Base case.
+        var nextKey = selectunassgnVariable(unassgn),
+            values = orderValues(nextKey, assigned, unassgn, CSPALG);
+        delete unassgn[nextKey];
+
+        for (var i = 0; i < values.length; i++) {
+          stepCounter++;
+          assigned[nextKey] = [values[i]]; // Assign a value to a variable.
+          var consistent = arcConsistency(assigned, unassgn, CSPALG);
+          var newunassgn = {}, newAssigned = {};
+          for (var key in consistent) {
+            if (assigned[key]) { newAssigned[key] = assigned[key].slice(); }
+            else { newunassgn[key] = consistent[key].slice(); }
+          }
+          if (CSPALG.cb) {
+            setTimeout(
+
+                (function (newAssigned, newunassgn) {
+                   return function () { CSPALG.cb(newAssigned, newunassgn, CSPALG); };
+                })(newAssigned, newunassgn),
+                stepCounter * CSPALG.timeStep
+              );
+          }
+          if (domEmpty(consistent)) { continue; } // Empty domains means failure.
+          var res = backtrackingAlg(newAssigned, newunassgn, CSPALG);
+          if (res != FAILURE) { return res; }
+        }
+
+        return FAILURE;
+      }
+
+      function finished(unassgn) {
+        // Checks if there are no more variables to assign.
+        return Object.keys(unassgn).length == 0;
+      }
+
+      function domEmpty(consistent) {
+        // Checks if any variable's domain is empty.
+        for (var key in consistent) {
+          if (consistent[key].length == 0) { return true; }
+        }
+        return false;
+      }
+
+      function partialAssgn(assigned, unassgn) {
+        // Combine unassgn and assigned for use in arcConsistency.
+        var partial = {};
+        for (var key in unassgn) { partial[key] = unassgn[key].slice(); }
+        for (var key in assigned) { partial[key] = assigned[key].slice(); }
+        return partial;
+      }
+
+      function arcConsistency(assigned, unassgn, CSPALG) {
+        // Enforces arc consistency by removing inconsistent values fromevery constraint's tail node.
+
+        function remInconVals(head, tail, constraint, variables) {
+
+          var hv = variables[head], tv = variables[tail];
+          var validTailValues = tv.filter(function (t) {
+            return hv.some(function (h) {
+              return constraint(h, t);
+            });
+          });
+          var removed = tv.length != validTailValues.length;
+          variables[tail] = validTailValues;
+          return removed;
+        }
+
+        function incomingConstraints(node) {
+          // Returns all the constraints where `node` is the head node.
+          return CSPALG.constraints.filter(function (c) {
+            return c[0] == node;
+          });
+        }
+
+        var queue = CSPALG.constraints.slice(),
+            variables = partialAssgn(assigned, unassgn);
+        while (queue.length) { // While there are more constraints to test.
+          var c = queue.shift(), head = c[0], tail = c[1], constraint = c[2];
+          if (remInconVals(head, tail, constraint, variables)) {
+
+            queue = queue.concat(incomingConstraints(tail));
+          }
+        }
+        return variables;
+      }
+
+      function selectunassgnVariable(unassgn) {
+        // Picks the next variable to assign according to the Minimum Remaining Values heuristic.
+        var minKey = null, minLen = Number.POSITIVE_INFINITY;
+        for (var key in unassgn) {
+          var len = unassgn[key].length;
+          if (len < minLen) { minKey = key, minLen = len; }
+        }
+        return minKey;
+      }
+
+      function orderValues(nextKey, assigned, unassgn, CSPALG) {
+
+        function countValues(vars) {
+          var sum = 0;
+          for (var key in vars) { sum += vars[key].length; }
+          return sum;
+        }
+
+        function valuesEliminated(val) {
+          assigned[nextKey] = [val];
+          var newLength = countValues(arcConsistency(assigned, unassgn, CSPALG));
+          delete assigned[nextKey];
+          return newLength;
+        }
+
+
+        var cache = {}, values = unassgn[nextKey];
+        values.forEach(function(val) {
+          cache[val] = valuesEliminated(val);
+        });
+        // Descending order based on the number of domain values remaining.
+        values.sort(function (a, b) { return cache[b] - cache[a]; });
+        return values;
+      }
+
+      if (typeof define === 'function' && define.amd) {
+        define(CSPALG);
+      } else if (typeof module === 'object' && module.exports) {
+        module.exports = CSPALG;
+      } else {
+        this.CSPALG = CSPALG;
+      }
+
+      }();
+      </script>
+      <script>
+      (function () {
+      function generate_sudoku() {
+        var starting_nums = [1, 4, 7, 2, 5, 8, 3, 6, 9],
+            SIZE = 9, BLOCK = Math.sqrt(SIZE) | 0,
+            grid = [];
+        for (var i = 0; i < SIZE; i++) {
+          var row = [], starting = starting_nums[i];
+          for (var j = 0; j < SIZE; j++) {
+            row.push(starting++);
+            if (starting == SIZE + 1) { starting = 1; }
+          }
+          grid.push(row);
+        }
+        function transpose(array) {
+          return array[0].map(function(_, i) {
+            return array.map(function(row) {
+              return row[i];
+            });
+          });
+        }
+        function swapRows(array) {
+          var row1 = (Math.random() * SIZE) | 0,
+              blockInd = row1 / BLOCK | 0, // Which block row1 is in.
+              row2 = row1;
+          while (row2 == row1) { row2 = BLOCK * blockInd + ((Math.random() * BLOCK) | 0); }
+          var r1 = array[row1].slice(), r2 = array[row2].slice();
+          array[row1] = r2; array[row2] = r1;
+          return array;
+        }
+        function swapRowBlocks(array) {
+          var b1 = (Math.random() * BLOCK) | 0, b2 = b1;
+          while (b2 == b1) { b2 = (Math.random() * BLOCK) | 0; }
+          for (var i = 0; i < BLOCK; i++) {
+            var row1 = b1 * BLOCK + i, row2 = b2 * BLOCK + i,
+                r1 = array[row1].slice(), r2 = array[row2].slice();
+            array[row1] = r2; array[row2] = r1;
+          }
+        }
+        var ITERS = 500;
+        for (var i = 0; i < ITERS; i++) {
+          switch (i % 4) {
+            case 0: // Row swap.
+              swapRows(grid);
+              break;
+            case 1: // Col swap.
+              grid = transpose(swapRows(transpose(grid)));
+              break;
+            case 2:
+              swapRowBlocks(grid);
+              break;
+            case 3: // Transpose
+              grid = transpose(grid);
+              break;
+          }
+        }
+        var selected = {}, num_selected = 30;
+        for (var ind = 0; ind < num_selected; ind++) {
+          var i = (Math.random() * SIZE) | 0, j = (Math.random() * SIZE) | 0;
+          if (selected[[i + 1,j + 1]]) { ind--; }
+          selected[[i + 1,j + 1]] = grid[i][j];
+        }
+        return selected;
+     }
+      function solveSudoku() {
+         var SIZE = 9, BLOCK_SIZE = Math.sqrt(SIZE) | 0, domain = [],
+             sudoku = {}, variables = {}, constraints = [],
+             filled_in = generate_sudoku();
+         for (var i = 1; i <= SIZE; i++) { domain.push(i); }
+         function neq(x, y) { return x != y; }
+         for (var i = 1; i <= SIZE; i++) {
+           for (var j = 1; j <= SIZE; j++) {
+             var fi = filled_in[[i,j]];
+             variables[[i, j]] = fi ? [fi] : domain.slice();
+             // Vertical and horizontal constraints.
+             for (var k = 1; k <= SIZE; k++) {
+               if (neq(i, j)) {
+                 constraints.push([[i, k], [j, k], neq]);
+                 constraints.push([[k, i], [k, j], neq]);
+               }
+             }
+             // Block constraints.
+             var v = (i - 1) / BLOCK_SIZE | 0, h = (j - 1) / BLOCK_SIZE | 0;
+             for (var k = v * 3; k < (v + 1) * BLOCK_SIZE; k++) {
+               for (var m = h * 3; m < (h + 1) * BLOCK_SIZE; m++) {
+                 if (neq(i, k + 1) || neq(j, m + 1)) {
+                   constraints.push([[k + 1, m + 1], [i, j], neq]);
+                 }
+               }
+             }
+           }
+         }
+
+         sudoku.variables = variables;
+         sudoku.constraints = constraints;
+         var node = document.getElementById('sudoku');
+
+         function visualize(assigned) {
+           var text = '', divider = '';
+           for (var i = 0; i <= SIZE * 4 - 1; i++) { divider += '-'; }
+           text += divider + '</br>';
+           for (var i = 1; i <= SIZE; i++) {
+             var row = '|';
+             for (var j = 1; j <= SIZE; j++) {
+               row += assigned[[i, j]] || '&nbsp; ';
+               row += j % BLOCK_SIZE != 0 ? ' &nbsp; ' : ' | '; // block boundaries.
+             }
+             text += row + '</br>';
+             if (i % BLOCK_SIZE == 0) { text += divider + '<br/>'; }
+           }
+           node.innerHTML = text;
+           return text;
+         }
+         sudoku.cb = visualize;
+         sudoku.timeStep = 500;
+         document.getElementById('sudoku-start').innerHTML = visualize(filled_in);
+         visualize({});
+         var res = CSPALG.solve(sudoku);
+         if (res == 'FAILURE') { console.log(res); }
+       }
+
+       document.getElementById('sudoku-button').onclick =  solveSudoku;
+      })();
+
+
+
+
+      </script>
+
+</html>

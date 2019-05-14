@@ -1,0 +1,14 @@
+SUDOKU AS A CSP
+
+Algorithm Description:
+A. Components:
+a. Variables, Domain, Constraints.
+b. A variable is an empty cell which can take one of 1 – 9 numbers which is the domain.
+c. Each variable has certain constraints that it needs to satisfy. There are three constraints in Sudoku.
+B. Steps for solving Sudoku:
+a. First, I’ll do a Search in the board to reduce the space. So, the components of searching are states which is possible values assigned to the variables, start state, goal state and successor state which is a state when the next variable is assigned. Start state is the state when the initial board is given and the goal state is when the board is solved. 
+b. I’ll use Depth First Search (DFS) for searching the space.
+c. The main algorithm that I’ll use is backtracking. After each value is assigned to a variable, a check is done if the variable is constraint satisfied. If the constraint fails the tree is trimmed to the state where it is constraint satisfied. This in turn reduces the search space.
+d. In this problem, I’ll use heuristics to improve the backtracking solver. The heuristics I’ll be using is Most Constraint Variable, i.e. a variable having more no. of constraints, which is, to choose a variable with least no. of values i.e. Minimum remaining value which is no. of values valid for a particular variable. So if we choose MRV, we minimize branching. 
+e. Next we will use constraint propagation, suppose a variable a’s constraint depends on another variable b, and b is changed then variable a will also be recomputed. This will re compute all the variables that depend on ‘a’. This is a recursive process and will stop only if there are no more changes. So, every time a variable is reassigned, the domain of the variable is reduced.
+f. So, using these steps we will reach the goal state where the Sudoku board will be solved.
